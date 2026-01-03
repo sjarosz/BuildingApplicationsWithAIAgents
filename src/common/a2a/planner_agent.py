@@ -89,16 +89,97 @@ except Exception:
 PLANNER_PORT = 8002
 PLANNER_HOST = "0.0.0.0"
 
-# ─── Agent Card ──────────────────────────────────────────────────────────────
+# ─── Agent Card (A2A Spec Compliant) ─────────────────────────────────────────
 
+# Raw agent card dict for full A2A spec compliance
+AGENT_CARD_DICT = {
+    "name": "PlannerAgent",
+    "description": "LLM-based planning agent that analyzes tasks and determines optimal tool usage. Uses GPT-4o to reason about which tools to call and with what parameters.",
+    "url": f"http://localhost:{PLANNER_PORT}",
+    "version": "1.0.0",
+    "protocol": "A2A/1.0",
+    "capabilities": {
+        "streaming": False,
+        "pushNotifications": False,
+        "stateTransitionHistory": False
+    },
+    "authentication": {
+        "schemes": ["none"]
+    },
+    "skills": [
+        {
+            "id": "planToolUsage",
+            "name": "Plan Tool Usage",
+            "description": "Analyzes a natural language task and returns a structured plan of which tools to call with their parameters",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "Natural language description of the task to plan tools for"
+                    }
+                },
+                "required": ["task"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "tools": {
+                        "type": "array",
+                        "description": "Ordered list of tool calls to execute",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "Name of the tool to call"
+                                },
+                                "params": {
+                                    "type": "object",
+                                    "description": "Parameters to pass to the tool"
+                                }
+                            },
+                            "required": ["name", "params"]
+                        }
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Explanation of why these tools were selected"
+                    },
+                    "original_task": {
+                        "type": "string",
+                        "description": "The original task that was analyzed"
+                    }
+                }
+            }
+        }
+    ],
+    "defaultInputModes": ["text"],
+    "defaultOutputModes": ["text"],
+    "provider": {
+        "organization": "BuildingApplicationsWithAIAgents",
+        "url": "https://github.com/your-org/agents"
+    },
+    "supportedTools": [
+        {"name": "add", "description": "Add two numbers"},
+        {"name": "subtract", "description": "Subtract two numbers"},
+        {"name": "multiply", "description": "Multiply two numbers"},
+        {"name": "divide", "description": "Divide two numbers"},
+        {"name": "get_current_time", "description": "Get current UTC time"},
+        {"name": "echo", "description": "Echo a message"},
+        {"name": "format_text", "description": "Format text (uppercase, lowercase, title, reverse)"}
+    ]
+}
+
+# Also create AgentCard object for backward compatibility
 agent_card = AgentCard(
     identity="PlannerAgent",
     description="LLM-based planner that determines which tools to use for a given task",
     capabilities=["planToolUsage"],
     schemas={
         "planToolUsage": ToolSchema(
-            input={"task": "string - The task description to plan tools for"},
-            output={"tools": "array - List of {name, params} tool calls to execute"}
+            input={"task": "string"},
+            output={"tools": "array", "reasoning": "string"}
         )
     },
     endpoint=f"http://localhost:{PLANNER_PORT}/api",
@@ -143,8 +224,14 @@ app = FastAPI(title="Planner Agent", description="A2A Planner Agent with LLM-bas
 
 @app.get("/.well-known/agent.json")
 async def get_agent_card():
-    """Return the agent card for A2A discovery."""
-    return JSONResponse(content=agent_card.to_dict())
+    """Return the full A2A-compliant agent card for discovery."""
+    return JSONResponse(content=AGENT_CARD_DICT)
+
+
+@app.get("/.well-known/agent-card")
+async def get_agent_card_alt():
+    """Alternative endpoint for agent card (some clients use this path)."""
+    return JSONResponse(content=AGENT_CARD_DICT)
 
 
 @app.post("/api")

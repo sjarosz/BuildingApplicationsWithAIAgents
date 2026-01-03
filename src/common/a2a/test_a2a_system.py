@@ -42,9 +42,9 @@ def make_rpc_request(url: str, method: str, params: Dict[str, Any]) -> Dict[str,
 
 
 def test_agent_cards():
-    """Test that agent cards are accessible."""
+    """Test that agent cards are accessible and A2A compliant."""
     print("=" * 60)
-    print("Testing Agent Cards")
+    print("Testing Agent Cards (A2A Spec)")
     print("=" * 60)
     
     # Test Orchestrator agent card
@@ -52,8 +52,15 @@ def test_agent_cards():
         response = httpx.get(f"{ORCHESTRATOR_URL}/.well-known/agent.json")
         card = response.json()
         print(f"\n✓ Orchestrator Agent Card:")
-        print(f"  Identity: {card['identity']}")
-        print(f"  Capabilities: {card['capabilities']}")
+        print(f"  Name: {card.get('name', card.get('identity', 'N/A'))}")
+        print(f"  URL: {card.get('url', card.get('endpoint', 'N/A'))}")
+        print(f"  Version: {card.get('version', 'N/A')}")
+        print(f"  Protocol: {card.get('protocol', 'N/A')}")
+        if 'skills' in card:
+            print(f"  Skills: {[s['id'] for s in card['skills']]}")
+        elif 'capabilities' in card:
+            print(f"  Capabilities: {card['capabilities']}")
+        print(f"  Description: {card.get('description', 'N/A')[:80]}...")
     except Exception as e:
         print(f"\n✗ Orchestrator Agent not available: {e}")
         return False
@@ -63,8 +70,17 @@ def test_agent_cards():
         response = httpx.get(f"{PLANNER_URL}/.well-known/agent.json")
         card = response.json()
         print(f"\n✓ Planner Agent Card:")
-        print(f"  Identity: {card['identity']}")
-        print(f"  Capabilities: {card['capabilities']}")
+        print(f"  Name: {card.get('name', card.get('identity', 'N/A'))}")
+        print(f"  URL: {card.get('url', card.get('endpoint', 'N/A'))}")
+        print(f"  Version: {card.get('version', 'N/A')}")
+        print(f"  Protocol: {card.get('protocol', 'N/A')}")
+        if 'skills' in card:
+            print(f"  Skills: {[s['id'] for s in card['skills']]}")
+        elif 'capabilities' in card:
+            print(f"  Capabilities: {card['capabilities']}")
+        if 'supportedTools' in card:
+            print(f"  Supported Tools: {[t['name'] for t in card['supportedTools']]}")
+        print(f"  Description: {card.get('description', 'N/A')[:80]}...")
     except Exception as e:
         print(f"\n✗ Planner Agent not available: {e}")
         return False

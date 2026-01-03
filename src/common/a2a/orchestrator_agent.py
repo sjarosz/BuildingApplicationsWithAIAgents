@@ -95,23 +95,111 @@ ORCHESTRATOR_PORT = 8001
 ORCHESTRATOR_HOST = "0.0.0.0"
 PLANNER_URL = "http://localhost:8002"
 
-# ─── Agent Card ──────────────────────────────────────────────────────────────
+# ─── Agent Card (A2A Spec Compliant) ─────────────────────────────────────────
 
+# Raw agent card dict for full A2A spec compliance
+AGENT_CARD_DICT = {
+    "name": "OrchestratorAgent",
+    "description": "Entry point A2A agent that coordinates task execution. Receives tasks via JSON-RPC, delegates planning to a Planner Agent, executes tools, and returns results.",
+    "url": f"http://localhost:{ORCHESTRATOR_PORT}",
+    "version": "1.0.0",
+    "protocol": "A2A/1.0",
+    "capabilities": {
+        "streaming": False,
+        "pushNotifications": False,
+        "stateTransitionHistory": False
+    },
+    "authentication": {
+        "schemes": ["none"]
+    },
+    "skills": [
+        {
+            "id": "executeTask",
+            "name": "Execute Task",
+            "description": "Execute a natural language task by planning and running appropriate tools",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "Natural language description of the task to execute"
+                    }
+                },
+                "required": ["task"]
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "task_results": {
+                        "type": "array",
+                        "description": "Results from each tool execution",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "tool": {"type": "string"},
+                                "params": {"type": "object"},
+                                "success": {"type": "boolean"},
+                                "result": {},
+                                "error": {"type": "string"}
+                            }
+                        }
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Human-readable summary of the task results"
+                    },
+                    "planning_reasoning": {
+                        "type": "string",
+                        "description": "Explanation of why tools were selected"
+                    },
+                    "original_task": {
+                        "type": "string",
+                        "description": "The original task that was submitted"
+                    }
+                }
+            }
+        },
+        {
+            "id": "listTools",
+            "name": "List Available Tools",
+            "description": "Returns a list of all tools available for task execution",
+            "inputSchema": {
+                "type": "object",
+                "properties": {}
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "tools": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of available tool names"
+                    }
+                }
+            }
+        }
+    ],
+    "defaultInputModes": ["text"],
+    "defaultOutputModes": ["text"],
+    "provider": {
+        "organization": "BuildingApplicationsWithAIAgents",
+        "url": "https://github.com/your-org/agents"
+    }
+}
+
+# Also create AgentCard object for backward compatibility
 agent_card = AgentCard(
     identity="OrchestratorAgent",
-    description="Entry point agent that coordinates task execution with the Planner Agent",
+    description="Entry point A2A agent that coordinates task execution with the Planner Agent",
     capabilities=["executeTask", "listTools"],
     schemas={
         "executeTask": ToolSchema(
-            input={"task": "string - The task to execute"},
-            output={
-                "task_results": "array - Results from each tool execution",
-                "summary": "string - Human-readable summary of results"
-            }
+            input={"task": "string"},
+            output={"task_results": "array", "summary": "string"}
         ),
         "listTools": ToolSchema(
             input={},
-            output={"tools": "array - List of available tool names"}
+            output={"tools": "array"}
         )
     },
     endpoint=f"http://localhost:{ORCHESTRATOR_PORT}/api",
@@ -133,8 +221,14 @@ app = FastAPI(
 
 @app.get("/.well-known/agent.json")
 async def get_agent_card():
-    """Return the agent card for A2A discovery."""
-    return JSONResponse(content=agent_card.to_dict())
+    """Return the full A2A-compliant agent card for discovery."""
+    return JSONResponse(content=AGENT_CARD_DICT)
+
+
+@app.get("/.well-known/agent-card")
+async def get_agent_card_alt():
+    """Alternative endpoint for agent card (some clients use this path)."""
+    return JSONResponse(content=AGENT_CARD_DICT)
 
 
 @app.post("/api")
